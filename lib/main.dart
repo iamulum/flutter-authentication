@@ -63,10 +63,6 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Keycloack Demo',
-      // initialRoute: '/',
-      // routes: {
-      //   '/': (context) => AuthScreen()
-      // },
       home: Scaffold(
         appBar: AppBar(
           title: const Text('Keycloack Demo'),
@@ -117,6 +113,7 @@ class _MyAppState extends State<MyApp> {
   Map<String, String> getUserInfo(String accessToken) {
     // alternative get user info using accessToken
     final String url = '$_oidUri/userinfo';
+    // TODO: hit $_oidc/userinfo using accessToken
     print('Action Get User Info Here: uri-$url, accToken-$accessToken');
     return {'division': 'device-gadget(example_return_from_user_info)'};
   }
@@ -164,12 +161,9 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> logoutAction() async {
     final String refreshToken = await secureStorage.read(key: 'refresh_token');
+    // TODO: hit $_oidc/logout using refreshToken
     print('Action Logout here with refresh token::$refreshToken');
 
-    // if (response != null && response.statusCode == 204) {
-    //   // Clear storage refresh token
-    //   await secureStorage.delete(key: 'refresh_token');
-    // }
     await secureStorage.delete(key: 'refresh_token');
     setState(() {
       isLoggedIn = false;
@@ -188,6 +182,7 @@ class _MyAppState extends State<MyApp> {
     });
 
     try {
+      // TODO: hit refreshToken
       print('Action Refresh Token Here');
       // await successAuthorizeUser(
       //   response.accessToken,
