@@ -42,7 +42,7 @@ Your application should have at least one enabled Connection. Click on the "Conn
 Finally, navigate to the "Settings" tab on your application page and set a callback URL in the **Allowed Callback URLs** field. For this demo, your callback URL should be the following value:
 
 ```text
-com.auth0.flutterdemo://login-callback
+com.keycloak.flutterdemo://login-callback
 ```
 
 Here is how it should look in your Application settings page:

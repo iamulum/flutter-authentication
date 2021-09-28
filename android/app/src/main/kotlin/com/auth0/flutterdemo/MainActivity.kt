@@ -1,4 +1,4 @@
-package com.auth0.flutterdemo
+package com.keycloak.flutterdemo
 
 import io.flutter.embedding.android.FlutterActivity
 

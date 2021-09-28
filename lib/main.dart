@@ -1,103 +1,41 @@
-/// -----------------------------------
-///          External Packages
-/// -----------------------------------
-
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
-
-import 'package:http/http.dart' as http;
 import 'package:flutter_appauth/flutter_appauth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+
+import 'login.dart';
+import 'profile.dart';
 
 final FlutterAppAuth appAuth = FlutterAppAuth();
 const FlutterSecureStorage secureStorage = FlutterSecureStorage();
 
-/// -----------------------------------
-///           Auth0 Variables
-/// -----------------------------------
+/// Keycloack Variables
+final String _domainEnv = dotenv.env['DOMAIN'];
+final String _clientId = dotenv.env['CLIENT_ID'];
+final String _redirectUri = dotenv.env['KYC_REDIRECT_URI'];
 
-const String AUTH0_DOMAIN = 'YOUR-AUTH0-DOMAIN';
-const String AUTH0_CLIENT_ID = 'YOUR-AUTH0-CLIENT-ID';
+final String _realmsUri = '$_domainEnv/auth/realms/axiapp';
+final String _oidUri = '$_realmsUri/protocol/openid-connect';
+// based on _realmsUri/.well-known/configuration
+final List<String> _scopes = <String>[
+  'openid', // to get idToken (remove if u're not using idToken)
+  'email',
+  'user_attribute',
+  'profile',
+];
 
-const String AUTH0_REDIRECT_URI = 'com.auth0.flutterdemo://login-callback';
-const String AUTH0_ISSUER = 'https://$AUTH0_DOMAIN';
-
-/// -----------------------------------
-///           Profile Widget
-/// -----------------------------------
-
-class Profile extends StatelessWidget {
-  final Future<void> Function() logoutAction;
-  final String name;
-  final String picture;
-
-  const Profile(this.logoutAction, this.name, this.picture, {Key key})
-      : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        Container(
-          width: 150,
-          height: 150,
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.blue, width: 4),
-            shape: BoxShape.circle,
-            image: DecorationImage(
-              fit: BoxFit.fill,
-              image: NetworkImage(picture ?? ''),
-            ),
-          ),
-        ),
-        const SizedBox(height: 24),
-        Text('Name: $name'),
-        const SizedBox(height: 48),
-        RaisedButton(
-          onPressed: () async {
-            await logoutAction();
-          },
-          child: const Text('Logout'),
-        ),
-      ],
-    );
-  }
+Future main() async {
+  await dotenv.load(fileName: '.env');
+  debugPrint(_domainEnv);
+  debugPrint(_clientId);
+  debugPrint(_redirectUri);
+  debugPrint(_realmsUri);
+  debugPrint(_oidUri);
+  // Here we set the URL strategy for our web app.
+  // It is safe to call this function when running on mobile or desktop as well.
+  runApp(const MyApp());
 }
-
-/// -----------------------------------
-///            Login Widget
-/// -----------------------------------
-
-class Login extends StatelessWidget {
-  final Future<void> Function() loginAction;
-  final String loginError;
-
-  const Login(this.loginAction, this.loginError, {Key key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: <Widget>[
-        RaisedButton(
-          onPressed: () async {
-            await loginAction();
-          },
-          child: const Text('Login'),
-        ),
-        Text(loginError ?? ''),
-      ],
-    );
-  }
-}
-
-/// -----------------------------------
-///                 App
-/// -----------------------------------
-
-void main() => runApp(const MyApp());
 
 class MyApp extends StatefulWidget {
   const MyApp({Key key}) : super(key: key);
@@ -106,34 +44,66 @@ class MyApp extends StatefulWidget {
   _MyAppState createState() => _MyAppState();
 }
 
-/// -----------------------------------
-///              App State
-/// -----------------------------------
-
 class _MyAppState extends State<MyApp> {
   bool isBusy = false;
   bool isLoggedIn = false;
   String errorMessage;
   String name;
+  String email;
   String picture;
+  String division;
+
+  @override
+  void initState() {
+    initAction();
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Auth0 Demo',
+      title: 'Keycloack Demo',
+      // initialRoute: '/',
+      // routes: {
+      //   '/': (context) => AuthScreen()
+      // },
       home: Scaffold(
         appBar: AppBar(
-          title: const Text('Auth0 Demo'),
+          title: const Text('Keycloack Demo'),
         ),
+        resizeToAvoidBottomInset: false,
         body: Center(
           child: isBusy
               ? const CircularProgressIndicator()
               : isLoggedIn
-                  ? Profile(logoutAction, name, picture)
+                  ? Profile(logoutAction, name, email, division, picture)
                   : Login(loginAction, errorMessage),
         ),
       ),
     );
+  }
+
+  Future<void> successAuthorizeUser(
+    String accessToken,
+    String refreshToken,
+    String idToken,
+  ) async {
+    try {
+      final Map<String, Object> decodedIdToken = parseIdToken(idToken);
+      final Map<String, Object> userInfo = getUserInfo(accessToken);
+      print('decoded $decodedIdToken');
+      await secureStorage.write(key: 'refresh_token', value: refreshToken);
+      debugPrint('userInfo ${userInfo['division']}');
+      setState(() {
+        isBusy = false;
+        isLoggedIn = true;
+        name = decodedIdToken['name'];
+        email = decodedIdToken['email'];
+        division = userInfo['division'];
+      });
+    } on Exception catch (e) {
+      throw Exception('Failed action successAuthorizeUser:: $e');
+    }
   }
 
   Map<String, Object> parseIdToken(String idToken) {
@@ -144,18 +114,11 @@ class _MyAppState extends State<MyApp> {
         utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
   }
 
-  Future<Map<String, Object>> getUserDetails(String accessToken) async {
-    const String url = 'https://$AUTH0_DOMAIN/userinfo';
-    final http.Response response = await http.get(
-      url,
-      headers: <String, String>{'Authorization': 'Bearer $accessToken'},
-    );
-
-    if (response.statusCode == 200) {
-      return jsonDecode(response.body);
-    } else {
-      throw Exception('Failed to get user details');
-    }
+  Map<String, String> getUserInfo(String accessToken) {
+    // alternative get user info using accessToken
+    final String url = '$_oidUri/userinfo';
+    print('Action Get User Info Here: uri-$url, accToken-$accessToken');
+    return {'division': 'device-gadget(example_return_from_user_info)'};
   }
 
   Future<void> loginAction() async {
@@ -167,28 +130,27 @@ class _MyAppState extends State<MyApp> {
     try {
       final AuthorizationTokenResponse result =
           await appAuth.authorizeAndExchangeCode(
-        AuthorizationTokenRequest(
-          AUTH0_CLIENT_ID,
-          AUTH0_REDIRECT_URI,
-          issuer: 'https://$AUTH0_DOMAIN',
-          scopes: <String>['openid', 'profile', 'offline_access'],
-          // promptValues: ['login']
-        ),
+        AuthorizationTokenRequest(_clientId, _redirectUri,
+            issuer: _realmsUri, scopes: _scopes,
+            // change to dynamic variable, if there are multiple socmed provided
+            additionalParameters: {'kc_idp_hint': 'google'}),
       );
 
-      final Map<String, Object> idToken = parseIdToken(result.idToken);
-      final Map<String, Object> profile =
-          await getUserDetails(result.accessToken);
+      // debug Payload
+      debugPrint('accessToken:::${result.accessToken}');
+      debugPrint('refreshToken:::${result.refreshToken}');
+      debugPrint('expired:::${result.accessTokenExpirationDateTime}');
+      debugPrint('idToken:::${result.idToken}');
+      debugPrint('tokenType:::${result.tokenType}');
+      debugPrint(
+          'extraAuthParams:::${result.authorizationAdditionalParameters}');
+      debugPrint('extraTokenParams:::${result.tokenAdditionalParameters}');
 
-      await secureStorage.write(
-          key: 'refresh_token', value: result.refreshToken);
-
-      setState(() {
-        isBusy = false;
-        isLoggedIn = true;
-        name = idToken['name'];
-        picture = profile['picture'];
-      });
+      await successAuthorizeUser(
+        result.accessToken,
+        result.refreshToken,
+        result.idToken,
+      );
     } on Exception catch (e, s) {
       debugPrint('login error: $e - stack: $s');
 
@@ -201,17 +163,19 @@ class _MyAppState extends State<MyApp> {
   }
 
   Future<void> logoutAction() async {
+    final String refreshToken = await secureStorage.read(key: 'refresh_token');
+    print('Action Logout here with refresh token::$refreshToken');
+
+    // if (response != null && response.statusCode == 204) {
+    //   // Clear storage refresh token
+    //   await secureStorage.delete(key: 'refresh_token');
+    // }
     await secureStorage.delete(key: 'refresh_token');
     setState(() {
       isLoggedIn = false;
       isBusy = false;
     });
-  }
-
-  @override
-  void initState() {
-    initAction();
-    super.initState();
+    print('PLEASE DO LOGOUT USER FROM SESSION ON KYC DASHBOARD');
   }
 
   Future<void> initAction() async {
@@ -224,25 +188,14 @@ class _MyAppState extends State<MyApp> {
     });
 
     try {
-      final TokenResponse response = await appAuth.token(TokenRequest(
-        AUTH0_CLIENT_ID,
-        AUTH0_REDIRECT_URI,
-        issuer: AUTH0_ISSUER,
-        refreshToken: storedRefreshToken,
-      ));
-
-      final Map<String, Object> idToken = parseIdToken(response.idToken);
-      final Map<String, Object> profile =
-          await getUserDetails(response.accessToken);
-
-      await secureStorage.write(
-          key: 'refresh_token', value: response.refreshToken);
-
+      print('Action Refresh Token Here');
+      // await successAuthorizeUser(
+      //   response.accessToken,
+      //   response.refreshToken,
+      //   response.idToken,
+      // );
       setState(() {
         isBusy = false;
-        isLoggedIn = true;
-        name = idToken['name'];
-        picture = profile['picture'];
       });
     } on Exception catch (e, s) {
       debugPrint('error on refresh token: $e - stack: $s');
