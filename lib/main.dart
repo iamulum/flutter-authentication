@@ -44,6 +44,7 @@ class MyApp extends StatefulWidget {
   _MyAppState createState() => _MyAppState();
 }
 
+// TODO: refactor using BLoc pattern and organize app routes
 class _MyAppState extends State<MyApp> {
   bool isBusy = false;
   bool isLoggedIn = false;
@@ -118,7 +119,7 @@ class _MyAppState extends State<MyApp> {
     return {'division': 'device-gadget(example_return_from_user_info)'};
   }
 
-  Future<void> loginAction() async {
+  Future<void> loginAction(String socmed) async {
     setState(() {
       isBusy = true;
       errorMessage = '';
@@ -130,7 +131,7 @@ class _MyAppState extends State<MyApp> {
         AuthorizationTokenRequest(_clientId, _redirectUri,
             issuer: _realmsUri, scopes: _scopes,
             // change to dynamic variable, if there are multiple socmed provided
-            additionalParameters: {'kc_idp_hint': 'google'}),
+            additionalParameters: {'kc_idp_hint': socmed}),
       );
 
       // debug Payload

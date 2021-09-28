@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class Login extends StatelessWidget {
-  final Future<void> Function() loginAction;
+  final Future<void> Function(String socmed) loginAction;
   final String loginError;
 
   const Login(this.loginAction, this.loginError, {Key key}) : super(key: key);
@@ -12,10 +12,18 @@ class Login extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: <Widget>[
         ElevatedButton(
+          style: ElevatedButton.styleFrom(primary: Colors.red),
           onPressed: () async {
-            await loginAction();
+            await loginAction('google');
           },
-          child: const Text('Login'),
+          child: const Text('Sign in with Google'),
+        ),
+        const SizedBox(height: 10),
+        ElevatedButton(
+          onPressed: () async {
+            await loginAction('facebook');
+          },
+          child: const Text('Sign in with Facebook'),
         ),
         Text(loginError ?? ''),
       ],
